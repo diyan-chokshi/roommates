@@ -47,8 +47,18 @@ Tests run the actual SQL migration in PGlite (PostgreSQL compiled to WASM), usin
 
    Save the generated passcodes in a password manager and send each roommate only their own passcode through a private channel. The script prints each passcode once on account creation; reruns reuse accounts and do not change passwords. Do not run provisioning in CI, record the terminal, or share its output. Browser sessions stay signed in; the passcode can also be saved in a password manager.
 
+   To save newly generated passcodes in an ignored local file instead of printing them:
+
+   ```powershell
+   npm run provision -- --passcodes-file=.env.roommate-passcodes.local
+   ```
+
+   The script also verifies password sign-in and household access for each newly created account. The passcode file is excluded from Git by the `.env*` rule. Keep it private; rerunning provisioning does not recover or replace existing passwords.
+
 6. Remove `SUPABASE_SECRET_KEY` from `.env.local` when provisioning is complete.
 7. Set Authentication → URL Configuration → Site URL to `https://diyan-chokshi.github.io/roommates/`. The app uses password login rather than redirects or magic links.
+
+   Alternatively, with `SUPABASE_ACCESS_TOKEN` authorized for this project’s Auth configuration, run `node --env-file=.env.local scripts/configure-auth.mjs`. This sets the Site URL and verifies that email login is enabled and new signups/anonymous sign-ins are disabled. Account provisioning and this URL configuration can be completed before publishing GitHub Pages.
 
 Login names map internally to `diyan@roommates.invalid`, `pranav@roommates.invalid`, `rohan@roommates.invalid`, and `vitthal@roommates.invalid`. These are identifiers, not inboxes. Do not send mail to them. There is no reset UI; a rare manual reset can be performed through the Supabase Auth admin API for the existing user. Do not delete/recreate accounts, because member identities are linked to their user IDs.
 
