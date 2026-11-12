@@ -36,7 +36,7 @@ Tests run the actual SQL migration in PGlite (PostgreSQL compiled to WASM), usin
 ## One-time Supabase setup
 
 1. Create a **Free** Supabase project. Save the database password privately. No paid upgrade is needed. Low-activity free projects may pause and require restoration in the Supabase dashboard.
-2. In SQL Editor, execute the entire file `supabase/migrations/202611120001_household.sql` once. It creates private tables and narrow authenticated RPCs. Do not expose the `app_private` schema through the Data API.
+2. In SQL Editor, execute the files in `supabase/migrations/` once each, in filename order. The first creates private tables and narrow authenticated RPCs; the second adds a public read-only health check with no household data. Do not expose the `app_private` schema through the Data API.
 3. Under Authentication → Providers / Sign In, enable email/password and **disable new user signups**. Disable anonymous sign-in. The four users are created with the admin API, so no confirmation mail is sent.
 4. Under Project Settings → API Keys, copy the project URL and **publishable key** (`sb_publishable_...`) into `.env.local`. Keep the **secret key** (`sb_secret_...`) only in the unprefixed `SUPABASE_SECRET_KEY` variable. Never use that key as a `VITE_` value, a GitHub variable, or frontend configuration. Use the new publishable/secret keys rather than legacy anon/service-role API keys. Secret keys still use the Postgres `service_role` role, so the migration's database grants remain correct. The separate `SUPABASE_ACCESS_TOKEN` is a management token for executing migrations; it is not an application API key.
 5. Provision the four accounts from your local terminal:
@@ -89,6 +89,12 @@ Use a public repository for free GitHub-hosted Actions/Pages availability withou
 `get_dashboard()` uses database time and a transaction-level household lock. Before reading it finalizes every missing completed week in order, saves immutable report snapshots, clears the completed week's chore votes, and clears the closing period's strike proposals only after preserving its totals. Mutations take the same lock and check time **after** acquisition. Direct browser writes to tables are denied.
 
 The browser reloads data every 15 seconds while visible, on focus/reconnection, after actions, and at the next opening/rotation boundary. A missed browser timer cannot extend a deadline: the database is authoritative. Reports materialize on the first authenticated operation after cutoff; multiple weeks of inactivity are handled on the next visit. No user needs to keep a tab open.
+
+### Database recovery page
+
+Supabase gateway status 540 opens a dedicated paused-database page from either login or the board. Network and other server failures show connection-recovery guidance without claiming that the project is paused. Invalid passwords and ordinary access errors stay in their existing flows. A recovery link is also available on the login screen.
+
+The page links to the project dashboard and explains how the owner can resume the project. **Check connection & return** calls the read-only `household_health` RPC using only the publishable key; it returns to the app only after Postgres responds successfully. This function returns only `true`, exposes no household records, and cannot change data. No management access token or secret API key is included in the website, and the page cannot resume Supabase itself. Transport and recovery-page tests use simulated failures rather than pausing the live household database.
 
 RPCs:
 

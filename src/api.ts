@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Dashboard } from './domain';
+import { checkConnection, serviceFetch } from './service-status';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 export const configured = Boolean(url && key && !url.includes('YOUR_PROJECT'));
-export const supabase = configured ? createClient(url, key) : null;
+export const supabase = configured ? createClient(url, key, { global: { fetch: serviceFetch } }) : null;
+export const retryConnection = () => checkConnection(url, key);
 export async function dashboard(): Promise<Dashboard> {
   const { data, error } = await supabase!.rpc('get_dashboard');
   if (error) throw new Error(error.message);

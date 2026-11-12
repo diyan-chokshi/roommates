@@ -23,6 +23,7 @@ beforeAll(async()=>{
   const sql=readFileSync(new URL('../supabase/migrations/202611120001_household.sql',import.meta.url),'utf8')
     .replaceAll('clock_timestamp()',"current_setting('test.now')::timestamptz");
   await db.exec(sql);
+  await db.exec(readFileSync(new URL('../supabase/migrations/202611120002_household_health.sql',import.meta.url),'utf8'));
   for(let i=0;i<4;i++)await db.query('select public.link_roommate($1,$2)',[i,ids[i]]);
 },30000);
 beforeEach(async()=>{
@@ -124,6 +125,11 @@ describe('Sunday missed-chore voting',()=>{
 });
 
 describe('access control',()=>{
+  it('allows a public read-only health probe without access to household data',async()=>{
+    await db.exec('reset role; set role anon');
+    expect((await db.query<{ready:boolean}>('select public.household_health() as ready')).rows[0].ready).toBe(true);
+    await expect(db.query('select * from app_private.members')).rejects.toThrow('permission denied');
+  });
   it('denies unlinked accounts even with an authenticated token',async()=>{
     await db.query("select set_config('test.uid','20000000-0000-4000-8000-000000000000',false)");
     await expect(get()).rejects.toThrow('Household access');await expect(propose(1)).rejects.toThrow('Household access');

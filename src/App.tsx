@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { configured, dashboard, mutate, supabase } from './api';
+import { configured, dashboard, mutate, retryConnection, supabase } from './api';
+import { RecoveryPage } from './RecoveryPage';
+import { getServiceStatus, showConnectionHelp, subscribeServiceStatus } from './service-status';
 import { choreFor, chores, formatTime, hints, loginEmail, money, names, strikeCharge, type Dashboard, type Report } from './domain';
 
 function HouseMark() {
@@ -27,7 +29,7 @@ function Login() {
         {!configured ? <div className="setup-note"><strong>The board is ready for setup.</strong><p>Connect your Supabase project to enable sign-in. Follow the setup instructions in the repository README.</p></div> : <form onSubmit={signIn}>
           <div className="person-picker" role="group" aria-label="Choose your name">{names.map((n,i)=><button type="button" aria-pressed={person===i} className={person===i?'selected':''} key={n} onClick={()=>{setPerson(i);setPasscode('');setError('');}}>{n}</button>)}</div>
           <label htmlFor="passcode">Your passcode</label><input id="passcode" type="password" autoComplete="current-password" required value={passcode} onChange={e=>setPasscode(e.target.value)} placeholder="Enter your personal passcode" />
-          {error && <p role="alert" className="error">{error}</p>}<button className="primary wide" disabled={busy || !passcode}>{busy?'Opening the door…':'Open the board'} <span aria-hidden="true">↗</span></button><p className="fine-print">You’ll stay signed in on this device.</p>
+          {error && <p role="alert" className="error">{error}</p>}<button className="primary wide" disabled={busy || !passcode}>{busy?'Opening the door…':'Open the board'} <span aria-hidden="true">↗</span></button><p className="fine-print">You’ll stay signed in on this device.</p><button type="button" className="connection-help" onClick={showConnectionHelp}>Trouble connecting? Restore database</button>
         </form>}
       </section></main><footer>Less mess. More living.</footer></div>;
 }
@@ -118,6 +120,7 @@ function Board({ onLogout }: {onLogout:()=>Promise<void>}) {
 }
 
 export default function App() {
+  const serviceStatus = useSyncExternalStore(subscribeServiceStatus, getServiceStatus);
   const [session,setSession]=useState<Session|null>(null);
   const [ready,setReady]=useState(!configured);
   const [authError,setAuthError]=useState('');
@@ -128,6 +131,7 @@ export default function App() {
     const {data}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);setReady(true);});
     return()=>{active=false;data.subscription.unsubscribe();};
   },[]);
+  if(configured && serviceStatus !== 'available') return <RecoveryPage status={serviceStatus} brand={<Brand />} projectUrl={import.meta.env.VITE_SUPABASE_URL} onRetry={retryConnection} />;
   if(!ready)return <div className="initial-loading"><Brand /><p>Opening the household board…</p></div>;
   if(!session)return <>{authError&&<p className="banner error" role="alert">{authError}</p>}<Login /></>;
   return <Board key={session.user.id} onLogout={async()=>{const {error}=await supabase!.auth.signOut({scope:'local'});if(error)throw error;}} />;
